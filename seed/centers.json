@@ -1,0 +1,16 @@
+{
+  "_note": "Added by us. The original seed has no centers or coaches; this minimal set makes coach scoping visible.",
+  "centers": [
+    {"id":"center-a","name":"Center A (Hyderabad)"},
+    {"id":"center-b","name":"Center B (Bengaluru)"}
+  ],
+  "coaches": [
+    {"id":"coach-a","name":"Meera Iyer","centerId":"center-a"},
+    {"id":"coach-b","name":"Arjun Das","centerId":"center-b"}
+  ],
+  "memberships": [
+    {"studentId":"s1","centerId":"center-a"},
+    {"studentId":"s2","centerId":"center-a"},
+    {"studentId":"s3","centerId":"center-b"}
+  ]
+}

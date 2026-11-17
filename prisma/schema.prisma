@@ -1,0 +1,194 @@
+// Upskill dashboard schema.
+//
+// Layout (see README "Data model" for the ER diagram):
+//   Shared catalog (global):   courses, skills, course_skills, course_prerequisites
+//   Per-center:                centers, coaches
+//   Learner identity (global): learners, learner_goals
+//   Learner <-> center:        learner_center_memberships (history kept, one open row)
+//   Progress (global):         enrollments, activity_events
+//
+// Enrollments and activity are deliberately NOT center-scoped: progress follows the
+// learner when they move centers. Coach visibility is derived from the learner's
+// open membership.
+//
+// Constraints Prisma cannot express are added as raw SQL in the init migration:
+//   - course_prerequisites: no self-reference (CHECK)
+//   - courses.total_lessons > 0, enrollments.completed_lessons >= 0 (CHECK)
+//   - learner_center_memberships: ended_at >= started_at (CHECK)
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Shared, global catalog
+// ---------------------------------------------------------------------------
+
+model Course {
+  id           String @id
+  title        String
+  totalLessons Int    @map("total_lessons")
+
+  skills        CourseSkill[]
+  prerequisites CoursePrerequisite[] @relation("CourseHasPrerequisite")
+  unlocks       CoursePrerequisite[] @relation("PrerequisiteUnlocksCourse")
+  enrollments   Enrollment[]
+  events        ActivityEvent[]
+
+  @@map("courses")
+}
+
+model Skill {
+  id   String @id @default(cuid())
+  name String @unique
+
+  courses CourseSkill[]
+  goals   LearnerGoal[]
+
+  @@map("skills")
+}
+
+model CourseSkill {
+  courseId String @map("course_id")
+  skillId  String @map("skill_id")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  skill  Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, skillId])
+  @@index([skillId])
+  @@map("course_skills")
+}
+
+model CoursePrerequisite {
+  courseId             String @map("course_id")
+  prerequisiteCourseId String @map("prerequisite_course_id")
+
+  course       Course @relation("CourseHasPrerequisite", fields: [courseId], references: [id], onDelete: Cascade)
+  prerequisite Course @relation("PrerequisiteUnlocksCourse", fields: [prerequisiteCourseId], references: [id], onDelete: Restrict)
+
+  @@id([courseId, prerequisiteCourseId])
+  @@index([prerequisiteCourseId])
+  @@map("course_prerequisites")
+}
+
+// ---------------------------------------------------------------------------
+// Per-center
+// ---------------------------------------------------------------------------
+
+model Center {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  coaches     Coach[]
+  memberships LearnerCenterMembership[]
+
+  @@map("centers")
+}
+
+model Coach {
+  id       String @id @default(cuid())
+  name     String
+  centerId String @map("center_id")
+
+  center Center @relation(fields: [centerId], references: [id], onDelete: Restrict)
+
+  @@index([centerId])
+  @@map("coaches")
+}
+
+// ---------------------------------------------------------------------------
+// Learners (global identity) and their center history
+// ---------------------------------------------------------------------------
+
+model Learner {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  memberships LearnerCenterMembership[]
+  goals       LearnerGoal[]
+  enrollments Enrollment[]
+  events      ActivityEvent[]
+
+  @@map("learners")
+}
+
+model LearnerCenterMembership {
+  id        String    @id @default(cuid())
+  learnerId String    @map("learner_id")
+  centerId  String    @map("center_id")
+  startedAt DateTime  @default(now()) @map("started_at") @db.Timestamptz(3)
+  endedAt   DateTime? @map("ended_at") @db.Timestamptz(3)
+
+  learner Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  center  Center  @relation(fields: [centerId], references: [id], onDelete: Restrict)
+
+  // At most one open membership per learner. A move closes the old row and opens a new one.
+  @@unique([learnerId], map: "learner_center_memberships_one_open_per_learner", where: raw("ended_at IS NULL"))
+  // Coach scoping: "open memberships at center X".
+  @@index([centerId], map: "learner_center_memberships_open_by_center", where: raw("ended_at IS NULL"))
+  @@index([learnerId, startedAt])
+  @@map("learner_center_memberships")
+}
+
+model LearnerGoal {
+  learnerId String @map("learner_id")
+  skillId   String @map("skill_id")
+
+  learner Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  skill   Skill   @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@id([learnerId, skillId])
+  @@index([skillId])
+  @@map("learner_goals")
+}
+
+// ---------------------------------------------------------------------------
+// Progress (follows the learner across centers)
+// ---------------------------------------------------------------------------
+
+model Enrollment {
+  id               String   @id @default(cuid())
+  learnerId        String   @map("learner_id")
+  courseId         String   @map("course_id")
+  enrolledAt       DateTime @default(now()) @map("enrolled_at") @db.Timestamptz(3)
+  // Percent complete is derived: completed_lessons / courses.total_lessons. Never stored.
+  completedLessons Int      @default(0) @map("completed_lessons")
+
+  learner Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  @@unique([learnerId, courseId])
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+enum ActivityKind {
+  ENROLLED
+  PROGRESS
+
+  @@map("activity_kind")
+}
+
+model ActivityEvent {
+  id         String       @id @default(cuid())
+  learnerId  String       @map("learner_id")
+  courseId   String       @map("course_id")
+  kind       ActivityKind @default(PROGRESS)
+  occurredAt DateTime     @map("occurred_at") @db.Timestamptz(3)
+
+  learner Learner @relation(fields: [learnerId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  @@index([learnerId, occurredAt])
+  @@index([learnerId, courseId, occurredAt])
+  @@map("activity_events")
+}
