@@ -39,6 +39,25 @@ export function activeDaysInWindow(
   return days.size;
 }
 
+/**
+ * The calendar dates in the window, oldest first, each flagged active or not.
+ * Feeds the 7-dot activity strip; `filter(active).length` equals activeDaysInWindow.
+ */
+export function activityStrip(
+  eventTimes: Date[],
+  now: Date,
+  windowDays: number = ACTIVE_DAYS_WINDOW,
+): { date: string; active: boolean }[] {
+  const today = calendarDateKey(now);
+  const active = new Set(
+    eventTimes.filter((t) => t.getTime() <= now.getTime()).map(calendarDateKey),
+  );
+  return Array.from({ length: windowDays }, (_, i) => {
+    const date = addDays(today, i - (windowDays - 1));
+    return { date, active: active.has(date) };
+  });
+}
+
 /** Whole days elapsed since `since` (floored). Null when there is no timestamp. */
 export function daysSince(since: Date | null, now: Date): number | null {
   if (!since) return null;

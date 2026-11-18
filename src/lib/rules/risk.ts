@@ -66,13 +66,13 @@ export function learnerRisk(
   const daysInactive = daysSince(lastActivityAt, now);
   const globallyInactive = !lastActivityAt || inactiveTooLong(lastActivityAt, now);
 
+  const stalled = atRiskCourseIds.map((id) => catalog.get(id)!.title).join(", ");
   let reason: string;
   if (!lastActivityAt) reason = "No activity recorded yet";
+  else if (globallyInactive && stalled) reason = `No activity for ${daysInactive} days · stalled on ${stalled}`;
   else if (globallyInactive) reason = `No activity for ${daysInactive} days`;
-  else if (atRiskCourseIds.length > 0) {
-    const titles = atRiskCourseIds.map((id) => catalog.get(id)!.title);
-    reason = `Stalled on ${titles.join(", ")}`;
-  } else reason = "Active recently";
+  else if (stalled) reason = `Stalled on ${stalled}`;
+  else reason = "Active recently";
 
   return {
     atRisk: globallyInactive || atRiskCourseIds.length > 0,

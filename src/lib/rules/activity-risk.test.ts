@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeDaysInWindow, calendarDateKey, daysSince, latest } from "./activity";
+import { activeDaysInWindow, activityStrip, calendarDateKey, daysSince, latest } from "./activity";
 import { courseRisk, learnerRisk } from "./risk";
 import { enrollment, hoursBefore, seedCatalog } from "./test-helpers";
 
@@ -124,5 +124,22 @@ describe("learnerRisk", () => {
   it("uses the learner-wide last activity when newer than course activity", () => {
     const r = learnerRisk(seedCatalog, [], hoursBefore(NOW, 3), NOW);
     expect(r.atRisk).toBe(false);
+  });
+});
+
+describe("learnerRisk reason when idle everywhere AND stalled", () => {
+  it("names the stalled course too", () => {
+    const r = learnerRisk(seedCatalog, [enrollment("c5", 3, { lastActivityAt: hoursBefore(NOW, 24 * 7) })], null, NOW);
+    expect(r.reason).toBe("No activity for 7 days · stalled on Building Dashboards");
+  });
+});
+
+describe("activityStrip", () => {
+  it("lists the 7 window dates oldest first, flagging active ones", () => {
+    const strip = activityStrip([ist("2026-11-17T09:00:00"), ist("2026-11-11T00:30:00")], NOW);
+    expect(strip).toHaveLength(7);
+    expect(strip[0]).toEqual({ date: "2026-11-11", active: true });
+    expect(strip[6]).toEqual({ date: "2026-11-17", active: true });
+    expect(strip.filter((d) => d.active)).toHaveLength(2);
   });
 });

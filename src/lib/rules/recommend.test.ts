@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { recommendNext, unlockCount } from "./recommend";
+import { recommendAlternative, recommendNext, unlockCount } from "./recommend";
 import { course, enrollment, seedCatalog } from "./test-helpers";
 import { catalogFrom } from "./types";
 
@@ -153,5 +153,37 @@ describe("recommendNext: branch 4 (nothing applies)", () => {
     const r = recommendNext({ catalog: catalogFrom([]), goals: ["x"], enrollments: [] });
     expect(r.kind).toBe("none");
     expect(r.reason.length).toBeGreaterThan(0);
+  });
+});
+
+describe("recommendAlternative", () => {
+  it("is null when the main pick is already enrollable", () => {
+    const input = { catalog: seedCatalog, goals: ["sql"], enrollments: [] };
+    expect(recommendAlternative(input, recommendNext(input))).toBeNull();
+  });
+
+  it("Aisha (seed): finish React is primary; SQL Fundamentals is the enrollable alternative", () => {
+    const input = {
+      catalog: seedCatalog,
+      goals: ["react", "frontend"],
+      enrollments: [enrollment("c1", 12), enrollment("c2", 10), enrollment("c3", 4)],
+    };
+    const alt = recommendAlternative(input, recommendNext(input));
+    expect(alt).toMatchObject({ courseId: "c4", canEnroll: true });
+    expect(alt!.reason).toBe("Start SQL Fundamentals: it unlocks 1 more course.");
+  });
+
+  it("falls back to any open course when nothing unlocks more", () => {
+    const catalog = catalogFrom([course("a", { skills: ["x"] }), course("b")]);
+    const input = { catalog, goals: ["x"], enrollments: [enrollment("a", 1)] };
+    const alt = recommendAlternative(input, recommendNext(input));
+    expect(alt).toMatchObject({ courseId: "b" });
+    expect(alt!.reason).toBe("Start Course b: it is open to you now.");
+  });
+
+  it("is null when no course is open", () => {
+    const catalog = catalogFrom([course("a", { skills: ["x"] }), course("b", { prerequisites: ["a"] })]);
+    const input = { catalog, goals: ["x"], enrollments: [enrollment("a", 1)] };
+    expect(recommendAlternative(input, recommendNext(input))).toBeNull();
   });
 });

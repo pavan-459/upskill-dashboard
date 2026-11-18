@@ -136,3 +136,33 @@ export function recommendNext({ catalog, goals, enrollments }: RecommendInput): 
   }
   return { kind: "none", courseId: null, reason, goalSkills: [], canEnroll: false };
 }
+
+/**
+ * A secondary, enrollable suggestion shown under the main pick when the main pick
+ * is not something to enroll in (e.g. "finish React Basics"). Keeps the learner one
+ * click from starting something new without turning the page into a catalog.
+ * Order: branch 1, then branch 3, then any eligible unenrolled course (lowest id).
+ */
+export function recommendAlternative(input: RecommendInput, primary: Recommendation): Recommendation | null {
+  // Branch 1 already returns an enrollable course; no alternative needed.
+  if (primary.canEnroll) return null;
+  const { catalog, enrollments } = input;
+  const enrolledIds = new Set(enrollments.map((e) => e.courseId));
+  // Branch 1 found nothing, so no open course teaches an unearned goal: rank by unlocks.
+  const open = [...catalog.values()]
+    .filter((c) => !enrolledIds.has(c.id) && isEligible(c.id, catalog, enrollments))
+    .map((course) => ({ course, unlocks: unlockCount(course.id, catalog) }));
+  const pick = best(open, (c) => [c.unlocks]);
+  if (!pick) return null;
+  const n = pick.unlocks;
+  return {
+    kind: "enroll-unlocks",
+    courseId: pick.course.id,
+    reason:
+      n > 0
+        ? `Start ${pick.course.title}: it unlocks ${n} more course${n === 1 ? "" : "s"}.`
+        : `Start ${pick.course.title}: it is open to you now.`,
+    goalSkills: [],
+    canEnroll: true,
+  };
+}
