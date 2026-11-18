@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Fragment } from "react";
+import { HowItWorks } from "./how-it-works";
 import { cx } from "./ui";
 
 const LINKS = [
@@ -9,30 +11,44 @@ const LINKS = [
   { href: "/coach", label: "Coach" },
 ];
 
-/** Role switcher. Stands in for auth (deliberately not built). */
-export function AppNav() {
+function useSection() {
   const pathname = usePathname();
+  return pathname.startsWith("/coach") ? "Coach" : "Learner";
+}
+
+/** "Upskill / Learner": brand plus where you are. */
+export function Breadcrumb() {
+  const section = useSection();
   return (
-    <nav aria-label="View as">
-      <ul className="flex rounded-lg border border-border bg-surface-muted p-0.5 text-sm">
-        {LINKS.map((l) => {
-          const active = l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
-          return (
-            <li key={l.href}>
-              <Link
-                href={l.href}
-                aria-current={active ? "page" : undefined}
-                className={cx(
-                  "inline-flex min-h-9 items-center rounded-md px-3 font-medium",
-                  active ? "bg-surface text-foreground shadow-sm" : "text-muted hover:text-foreground",
-                )}
-              >
-                {l.label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+    <Link href="/" className="whitespace-nowrap text-sm font-medium">
+      Upskill <span className="hidden text-muted sm:inline">/ {section}</span>
+    </Link>
+  );
+}
+
+/** Role switcher (stands in for auth) and the rules explainer. */
+export function AppNav() {
+  const section = useSection();
+  return (
+    <nav aria-label="Main" className="flex items-center gap-2 whitespace-nowrap text-sm sm:gap-3">
+      {LINKS.map((l) => (
+        <Fragment key={l.href}>
+          <Link
+            href={l.href}
+            aria-current={section === l.label ? "page" : undefined}
+            className={cx(
+              "transition",
+              section === l.label ? "font-medium text-foreground" : "text-muted hover:text-foreground",
+            )}
+          >
+            {l.label}
+          </Link>
+          <span aria-hidden className="text-border-strong">
+            /
+          </span>
+        </Fragment>
+      ))}
+      <HowItWorks />
     </nav>
   );
 }

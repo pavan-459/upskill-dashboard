@@ -1,11 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
-import { AppNav } from "@/components/app-nav";
+import { Inter, Instrument_Serif } from "next/font/google";
+import { AppNav, Breadcrumb } from "@/components/app-nav";
+import { ToastProvider } from "@/components/toast";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+const serif = Instrument_Serif({
+  variable: "--font-serif-display",
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+});
 
 export const metadata: Metadata = {
   title: "Upskill",
@@ -16,7 +21,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${serif.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <a
           href="#main"
@@ -24,20 +29,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to content
         </a>
-        <header className="sticky top-0 z-40 border-b border-border bg-surface/90 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-2.5">
-            <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-              <span aria-hidden className="grid size-7 place-items-center rounded-lg bg-accent text-sm text-accent-fg">
-                U
-              </span>
-              Upskill
-            </Link>
-            <AppNav />
-          </div>
-        </header>
-        <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-4">
-          {children}
-        </main>
+        <ToastProvider>
+          <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
+            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
+              <Breadcrumb />
+              <AppNav />
+            </div>
+          </header>
+          <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-8 sm:pt-12">
+            {children}
+          </main>
+        </ToastProvider>
       </body>
     </html>
   );

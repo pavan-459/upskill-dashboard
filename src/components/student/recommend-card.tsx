@@ -1,14 +1,21 @@
 import type { RecommendationDto } from "@/lib/dto";
-import { buttonClass, Card, CardTitle, ClockIcon, cx, EmptyState } from "../ui";
+import { ArrowIcon, buttonClass, ClockIcon, cx, PlusIcon, StarIcon } from "../ui";
+import type { EnrollTarget } from "./types";
 
 interface Props {
   recommendation: RecommendationDto;
   alternative: RecommendationDto | null;
   pendingCourseId: string | null;
-  enrollError: { title: string; reason: string } | null;
-  onEnroll: (rec: RecommendationDto) => void;
-  onDismissError: () => void;
+  onEnroll: (target: EnrollTarget) => void;
+  onOpenCourse: (courseId: string) => void;
 }
+
+const toTarget = (r: RecommendationDto): EnrollTarget => ({
+  courseId: r.courseId!,
+  title: r.courseTitle ?? "this course",
+  totalLessons: r.courseTotalLessons ?? 1,
+  skills: r.courseSkills,
+});
 
 function EnrollButton({
   rec,
@@ -18,14 +25,14 @@ function EnrollButton({
 }: {
   rec: RecommendationDto;
   pendingCourseId: string | null;
-  onEnroll: (rec: RecommendationDto) => void;
-  variant: "primary" | "secondary";
+  onEnroll: (t: EnrollTarget) => void;
+  variant: "onInverse" | "onInverseOutline";
 }) {
   const pending = pendingCourseId === rec.courseId;
   return (
     <button
       type="button"
-      onClick={() => onEnroll(rec)}
+      onClick={() => onEnroll(toTarget(rec))}
       disabled={pendingCourseId !== null}
       aria-label={pending ? `Enrolling in ${rec.courseTitle}` : `Enroll in ${rec.courseTitle}`}
       className={cx(buttonClass[variant], "w-full sm:w-auto")}
@@ -35,65 +42,76 @@ function EnrollButton({
           <ClockIcon /> Enrolling…
         </>
       ) : (
-        "Enroll"
+        <>
+          <PlusIcon /> Enroll
+        </>
       )}
     </button>
   );
 }
 
-export function RecommendCard({ recommendation: rec, alternative, pendingCourseId, enrollError, onEnroll, onDismissError }: Props) {
+/** The dark focal card: one next step, why, and one click to act. */
+export function RecommendCard({ recommendation: rec, alternative, pendingCourseId, onEnroll, onOpenCourse }: Props) {
   return (
-    <Card aria-labelledby="rec-title" className="border-accent/40">
-      <CardTitle id="rec-title">Recommended next</CardTitle>
+    <section
+      aria-labelledby="rec-title"
+      className="relative overflow-hidden rounded-3xl bg-inverse p-5 text-inverse-fg shadow-[0_24px_48px_-24px_rgb(0_0_0/0.6)] sm:p-6"
+    >
+      <p id="rec-title" className="flex items-center gap-1.5 text-xs font-medium text-inverse-muted">
+        <StarIcon /> Recommended next
+      </p>
 
       {rec.kind === "none" ? (
         <div className="mt-3">
-          <EmptyState title="No recommendation right now">{rec.reason}</EmptyState>
+          <p className="font-serif text-2xl italic">Nothing to suggest right now</p>
+          <p className="mt-1 text-sm text-inverse-muted">{rec.reason}</p>
         </div>
       ) : (
-        <div className="mt-2">
-          <p className="text-lg font-semibold leading-snug">{rec.courseTitle}</p>
-          <p className="mt-1 text-sm text-muted">{rec.reason}</p>
-          <div className="mt-3">
+        <div className="mt-3">
+          <p className="text-2xl font-semibold leading-tight tracking-tight">{rec.courseTitle}</p>
+          <p className="mt-2 text-sm text-inverse-muted">{rec.reason}</p>
+          {rec.goalSkills.length > 0 && (
+            <p className="mt-3 flex flex-wrap gap-1.5">
+              {rec.goalSkills.map((s) => (
+                <span key={s} className="rounded-full border border-inverse-border px-2.5 py-0.5 text-xs">
+                  Goal · {s}
+                </span>
+              ))}
+            </p>
+          )}
+          <div className="mt-5">
             {rec.canEnroll ? (
-              <EnrollButton rec={rec} pendingCourseId={pendingCourseId} onEnroll={onEnroll} variant="primary" />
+              <EnrollButton rec={rec} pendingCourseId={pendingCourseId} onEnroll={onEnroll} variant="onInverse" />
             ) : (
-              <a
-                href={`#course-${rec.courseId}`}
-                onClick={() => {
-                  // Move focus with the scroll so keyboard and screen-reader users follow.
-                  requestAnimationFrame(() => document.getElementById(`course-${rec.courseId}`)?.focus());
-                }}
-                className={cx(buttonClass.primary, "w-full sm:w-auto")}
+              <button
+                type="button"
+                onClick={() => onOpenCourse(rec.courseId!)}
+                className={cx(buttonClass.onInverse, "w-full sm:w-auto")}
               >
-                Continue {rec.courseTitle}
-              </a>
+                Continue {rec.courseTitle} <ArrowIcon />
+              </button>
             )}
           </div>
         </div>
       )}
 
       {alternative && (
-        <div className="mt-4 border-t border-border pt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Or start something new</p>
-          <p className="mt-1 font-medium">{alternative.courseTitle}</p>
-          <p className="text-sm text-muted">{alternative.reason}</p>
-          <div className="mt-2">
-            <EnrollButton rec={alternative} pendingCourseId={pendingCourseId} onEnroll={onEnroll} variant="secondary" />
+        <div className="mt-6 border-t border-inverse-border pt-4">
+          <p className="text-xs font-medium text-inverse-muted">Or start something new</p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-medium">{alternative.courseTitle}</p>
+              <p className="text-sm text-inverse-muted">{alternative.reason}</p>
+            </div>
+            <EnrollButton
+              rec={alternative}
+              pendingCourseId={pendingCourseId}
+              onEnroll={onEnroll}
+              variant="onInverseOutline"
+            />
           </div>
         </div>
       )}
-
-      {enrollError && (
-        <div role="alert" className="mt-3 rounded-lg bg-danger-soft p-3 text-sm text-danger">
-          <p>
-            <strong className="font-semibold">Couldn&apos;t enroll in {enrollError.title}.</strong> {enrollError.reason}
-          </p>
-          <button type="button" onClick={onDismissError} className="mt-1 font-semibold underline underline-offset-2">
-            Dismiss
-          </button>
-        </div>
-      )}
-    </Card>
+    </section>
   );
 }

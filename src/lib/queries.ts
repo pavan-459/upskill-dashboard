@@ -6,6 +6,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "./db";
 import type {
   CenterDto,
+  GoalProgressDto,
   CoachLearnerDto,
   CoachLearnersDto,
   CoachListItem,
@@ -24,7 +25,10 @@ import {
   courseRisk,
   DAY_MS,
   earnedSkills,
+  isEligible,
   learnerRisk,
+  learningPath,
+  lessonsToComplete,
   lockedHint,
   missingPrerequisites,
   percentComplete,
@@ -71,12 +75,26 @@ export async function loadCatalog(): Promise<CourseCatalog> {
 
 const openMembership = { where: { endedAt: null }, include: { center: true } } as const;
 
-export async function listStudents(): Promise<StudentListItem[]> {
+export async function listStudents(now: Date): Promise<StudentListItem[]> {
   const learners = await prisma.learner.findMany({
     orderBy: { name: "asc" },
-    include: { memberships: openMembership },
+    include: { memberships: openMembership, enrollments: true },
   });
-  return learners.map((l) => ({ id: l.id, name: l.name, centerName: l.memberships[0]?.center.name ?? null }));
+  const [catalog, lastByCourse] = await Promise.all([loadCatalog(), lastActivityByCourse(learners.map((l) => l.id))]);
+  return learners.map((l) => {
+    const enrollments: EnrollmentInfo[] = l.enrollments.map((e) => ({
+      courseId: e.courseId,
+      completedLessons: e.completedLessons,
+      enrolledAt: e.enrolledAt,
+      lastActivityAt: lastByCourse.get(`${l.id}:${e.courseId}`) ?? null,
+    }));
+    return {
+      id: l.id,
+      name: l.name,
+      centerName: l.memberships[0]?.center.name ?? null,
+      atRisk: learnerRisk(catalog, enrollments, null, now).atRisk,
+    };
+  });
 }
 
 /** Latest activity per (learner, course) for a set of learners. */
@@ -181,9 +199,39 @@ export async function getStudentDashboard(learnerId: string, now: Date): Promise
       missing: missing.map((m) => ({ ...m, percent: percentComplete(m.completedLessons, m.totalLessons) })),
     }));
 
+  const risk = learnerRisk(catalog, enrollments, null, now);
+  const byCourse = new Map(enrollments.map((e) => [e.courseId, e]));
+  const goalProgress: GoalProgressDto[] = goals.map((skill) => {
+    // Best route to the skill: an enrolled course (most progress), else an open one, else any.
+    const teaching = [...catalog.values()].filter((c) => c.skills.includes(skill));
+    const score = (id: string) => {
+      const e = byCourse.get(id);
+      if (e) return 2 + e.completedLessons / catalog.get(id)!.totalLessons;
+      return isEligible(id, catalog, enrollments) ? 1 : 0;
+    };
+    const pick = teaching.sort((a, b) => score(b.id) - score(a.id) || a.id.localeCompare(b.id))[0];
+    const done = pick ? (byCourse.get(pick.id)?.completedLessons ?? 0) : 0;
+    return {
+      skill,
+      earned: earnedSet.has(skill),
+      course: pick
+        ? {
+            courseId: pick.id,
+            title: pick.title,
+            percent: percentComplete(done, pick.totalLessons),
+            enrolled: byCourse.has(pick.id),
+            lessonsToEarn: lessonsToComplete(done, pick.totalLessons),
+          }
+        : null,
+    };
+  });
+
   return {
     learner: { id: learner.id, name: learner.name, centerName: learner.memberships[0]?.center.name ?? null },
+    status: { atRisk: risk.atRisk, reason: risk.reason, daysInactive: risk.daysInactive },
     goals: goals.map((skill) => ({ skill, earned: earnedSet.has(skill) })),
+    goalProgress,
+    path: learningPath(catalog, enrollments, goals, [recommendation.courseId, alternative?.courseId ?? null]),
     earnedSkills: earned,
     activeDays7: activeDaysInWindow(events, now),
     activityStrip: activityStrip(events, now),
@@ -287,6 +335,21 @@ export async function learnersVisibleToCoach(coachId: string, now: Date): Promis
       activeCourses,
       atRiskCourses: risk.atRiskCourseIds.map((id) => catalog.get(id)!.title),
       memberSince: l.memberships[0].startedAt.toISOString(),
+      activityStrip: activityStrip(recent.get(l.id) ?? [], now),
+      courses: enrollments
+        .filter((e) => catalog.has(e.courseId))
+        .map((e) => {
+          const c = catalog.get(e.courseId)!;
+          const r = courseRisk(e, c.totalLessons, now);
+          return {
+            courseId: c.id,
+            title: c.title,
+            percent: percentComplete(e.completedLessons, c.totalLessons),
+            status: r.status,
+            daysInactive: r.daysInactive,
+          };
+        })
+        .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.title.localeCompare(b.title)),
     };
   });
 

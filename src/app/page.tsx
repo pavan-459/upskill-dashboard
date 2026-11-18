@@ -7,18 +7,15 @@ import { DashboardSkeleton, PickerSkeleton, StudentDashboard } from "@/component
  */
 export default function Home() {
   return (
-    <>
-      <h1 className="sr-only">Learner dashboard</h1>
-      <Suspense
-        fallback={
-          <>
-            <PickerSkeleton />
-            <DashboardSkeleton />
-          </>
-        }
-      >
-        <StudentDashboard />
-      </Suspense>
-    </>
+    <Suspense
+      fallback={
+        <>
+          <PickerSkeleton />
+          <DashboardSkeleton />
+        </>
+      }
+    >
+      <StudentDashboard />
+    </Suspense>
   );
 }

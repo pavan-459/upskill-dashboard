@@ -38,11 +38,11 @@ async function expectAppError(p: Promise<unknown>, status: number, reason?: RegE
 
 describe("students", () => {
   it("lists every learner with their current center", async () => {
-    const list = await listStudents();
-    expect(list.map((s) => [s.id, s.centerName])).toEqual([
-      ["s1", "Center A (Hyderabad)"],
-      ["s3", "Center B (Bengaluru)"],
-      ["s2", "Center A (Hyderabad)"],
+    const list = await listStudents(NOW);
+    expect(list.map((s) => [s.id, s.centerName, s.atRisk])).toEqual([
+      ["s1", "Center A (Hyderabad)", false],
+      ["s3", "Center B (Bengaluru)", false],
+      ["s2", "Center A (Hyderabad)", true],
     ]);
   });
 

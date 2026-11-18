@@ -1,46 +1,52 @@
 @import "tailwindcss";
 
-/* Design tokens. Every colour pair below meets WCAG AA (4.5:1) for text. */
+/*
+ * Design tokens. Swiss-minimal: grey canvas, white cards with hairlines, near-black
+ * ink. Colour is reserved for meaning (status), always paired with an icon + text.
+ * Every text pair meets WCAG AA (4.5:1) on its surface, in both themes.
+ */
 :root {
-  --background: #f6f7f9;
+  --background: #f1f1f1;
   --surface: #ffffff;
-  --surface-muted: #f1f3f6;
-  --border: #dde1e7;
-  --foreground: #14171c;
-  --muted: #555e6b;
-  --accent: #3b46c4;
-  --accent-hover: #2f39a8;
-  --accent-fg: #ffffff;
-  --accent-soft: #eceefc;
-  --success: #17663a;
-  --success-soft: #e5f4ea;
-  --warning: #8a4b00;
-  --warning-soft: #fdf0dc;
-  --danger: #a3261c;
-  --danger-soft: #fce9e7;
-  --focus: #3b46c4;
+  --surface-muted: #f5f5f5;
+  --border: #e2e2e2;
+  --border-strong: #cfcfd2;
+  --foreground: #101012;
+  --muted: #62626a;
+  --inverse: #101012;
+  --inverse-fg: #f4f4f5;
+  --inverse-muted: #a6a6ae;
+  --inverse-border: #2c2c31;
+  --success: #12704a;
+  --success-soft: #e2f2ea;
+  --warning: #8a5200;
+  --warning-soft: #fcf0dc;
+  --danger: #b8321f;
+  --danger-soft: #fbe7e3;
+  --focus: #101012;
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0f1115;
-    --surface: #171a20;
-    --surface-muted: #1f232b;
-    --border: #2d323c;
-    --foreground: #eceef2;
-    --muted: #a3abb8;
-    --accent: #8b94f5;
-    --accent-hover: #a2a9f7;
-    --accent-fg: #0f1115;
-    --accent-soft: #23264a;
-    --success: #6fd49a;
-    --success-soft: #15291e;
-    --warning: #f3b860;
-    --warning-soft: #2d2212;
-    --danger: #f2877d;
-    --danger-soft: #2f1715;
-    --focus: #a2a9f7;
+    --background: #0c0c0e;
+    --surface: #151517;
+    --surface-muted: #1c1c1f;
+    --border: #28282c;
+    --border-strong: #3a3a40;
+    --foreground: #f1f1f2;
+    --muted: #a2a2ab;
+    --inverse: #f1f1f2;
+    --inverse-fg: #101012;
+    --inverse-muted: #55555d;
+    --inverse-border: #d6d6da;
+    --success: #5fd29b;
+    --success-soft: #11291e;
+    --warning: #f0b65c;
+    --warning-soft: #2c2110;
+    --danger: #ff8b78;
+    --danger-soft: #311612;
+    --focus: #f1f1f2;
     color-scheme: dark;
   }
 }
@@ -50,33 +56,60 @@
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
-  --color-accent-fg: var(--accent-fg);
-  --color-accent-soft: var(--accent-soft);
+  --color-inverse: var(--inverse);
+  --color-inverse-fg: var(--inverse-fg);
+  --color-inverse-muted: var(--inverse-muted);
+  --color-inverse-border: var(--inverse-border);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-serif-display);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv11";
 }
 
 /* One visible focus style for every interactive element. */
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 8px;
+}
+
+/* Native <dialog> and [popover]: soft backdrop, gentle entrance. */
+dialog::backdrop {
+  background: rgb(10 10 12 / 0.45);
+  backdrop-filter: blur(2px);
+}
+dialog[open],
+[popover]:popover-open {
+  animation: rise 160ms ease-out;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+.animate-toast {
+  animation: toast-in 200ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {

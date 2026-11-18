@@ -6,23 +6,42 @@ An internal learning dashboard for one job: **show coaches who is on track and w
 
 | Learner view (375px) | Coach view (375px) |
 |---|---|
-| <img src="docs/screenshots/learner-mobile.png" width="300" alt="Learner view on a phone: summary, recommendation and course progress" /> | <img src="docs/screenshots/coach-mobile.png" width="300" alt="Coach view on a phone: at-risk count and learners sorted by inactivity" /> |
+| <img src="docs/screenshots/learner-mobile.png" width="300" alt="Learner view on a phone: status header, stat tiles, recommendation, goals, courses and learning path" /> | <img src="docs/screenshots/coach-mobile.png" width="300" alt="Coach view on a phone: at-risk KPI, filters and learners with inactivity meters" /> |
 
-<img src="docs/screenshots/learner-desktop.png" width="820" alt="Learner view on desktop with an at-risk course and the locked courses list open" />
+<img src="docs/screenshots/learner-desktop.png" width="820" alt="Learner view on desktop" />
+<img src="docs/screenshots/coach-desktop.png" width="820" alt="Coach view on desktop" />
+<img src="docs/screenshots/learner-dark.png" width="820" alt="Learner view in dark mode for an at-risk learner" />
 
 Stack: Next.js 16 (App Router, Cache Components), Prisma 7 (`@prisma/adapter-pg`), Postgres, Tailwind 4, Vitest.
 
 ## What it does
 
-- **Learner view (`/`):** pick a learner to see their goals (earned or in progress), earned skills, and active days in the last 7 with a day-by-day strip.
-  - **My courses** shows a progress bar, percent, and an *On track*, *At risk · Nd idle* or *Completed* badge for each course. At-risk courses are listed first.
-  - **Recommended next** shows one course and a one-line reason. When that pick is "finish what you started", a second, enrollable suggestion sits under it, so starting something new is always one click away.
-  - **Enroll** is optimistic: the course appears at once and the button says *Enrolling…*. On success the server returns the recomputed dashboard; on failure the card rolls back and the server's reason is shown.
-  - **Locked for now** is the why-locked add-on: for each locked course it lists the missing prerequisites and how far along each one is.
-- **Coach view (`/coach`):** a coach picks themselves and sees only learners at their center, with the at-risk count at the top. Learners are sorted at-risk first, then by days inactive, each with a reason ("No activity for 7 days · stalled on Building Dashboards").
-  - **Move learner** sends a learner to another center. They drop off this coach's list (optimistically) and appear for the other center's coach, with their progress intact.
-- **States:** skeletons while loading, an error card with *Try again*, empty states with guidance (no courses, no recommendation, no learners at a center, unknown learner), and an `aria-live` announcement on enroll.
-- **Accessibility:** works at 375px with no horizontal scroll, labelled controls, a visible focus ring on everything, and badges with icon plus text (never colour alone). Colour pairs meet AA in light and dark mode, and a skip link is included.
+The visual language is Swiss-minimal: a grey canvas, white cards with hairlines, near-black ink, Inter with an Instrument Serif accent, and a floating dark pill for switching. Colour is reserved for status, and always appears with an icon and text.
+
+**Learner view (`/`)**
+- **Header.** The date and center, the learner's name, and one status line: *On track* or *Needs attention*, with the reason ("No activity for 7 days · stalled on Building Dashboards"). A dark pill switches between learners, with a status dot on each; long lists fall back to a select.
+- **Stat tiles.** Active days out of 7 (with a hoverable day strip), goals reached, skills earned, and courses in progress with the at-risk count. Each **?** opens a plain-words explanation.
+- **Recommended next.** A dark focal card with one course, a one-line reason, and **Enroll** or **Continue**. When the top pick is "finish what you started", an enrollable alternative sits underneath.
+- **Goals.** Each goal shows the course that gets the learner there, a progress bar with the **80% "skill earned" line** marked, and the lessons left.
+- **My courses.** Filter chips (All / At risk / In progress / Completed) and cards that expand to show dates, lessons left, skills, and an at-risk nudge.
+- **Learning path.** This is the interactive why-locked add-on. Prerequisite tracks are drawn as connected progress rings (finished, skills earned, in progress, open, locked), with goal and *Next* markers. Clicking a course shows exactly what is missing ("Finish SQL Fundamentals: 8 lessons left") with progress for each prerequisite, an **Enroll** button when it's open, or a jump to the course card.
+- **Enroll is optimistic everywhere.** The course appears at once with *Enrolling…*. On success a toast confirms it and the recommendation, goals and path all recompute. On failure the card rolls back and an error toast shows the server's reason.
+
+**Coach view (`/coach`)**
+- **Scoping.** Pick a coach and see only learners at that coach's center.
+- **KPI tiles.** At risk (highlighted), learners, average active days, and courses in progress.
+- **Filtering.** At-risk / on-track filter pills and a search box.
+- **Learner rows.** Each row shows the reason and a **days-inactive meter with the 3-day line marked**, plus a 7-day activity strip. Rows expand to show per-course progress, and *Open profile* jumps to the learner.
+- **Move center.** Opens a confirm dialog that explains what happens (progress follows, history is kept, they leave your list). The row disappears optimistically and a toast confirms the move.
+
+**Everywhere**
+- **How it works.** A link in the header opens every rule in plain words, with the numbers pulled from the same constants the code uses.
+- **States.** Skeletons while loading, an error card with *Try again*, empty states with guidance, and toasts announced through `aria-live`.
+- **Accessibility.**
+  - Fits a 375px screen with no sideways scrolling.
+  - Every control is labelled, focus is always visible, and Esc closes dialogs.
+  - Text contrast meets WCAG AA in light and dark mode.
+  - Reduced-motion preferences are respected.
 
 ## Setup
 
@@ -39,7 +58,7 @@ npm run dev                       # http://localhost:3000
 Tests and checks:
 
 ```bash
-npm test                          # 79 unit + seed-scenario tests (no DB needed)
+npm test                          # 85 unit + seed-scenario tests (no DB needed)
 createdb upskill_test             # once
 npm run test:int                  # 17 integration tests against upskill_test (refuses any DB not named *_test)
 npm run typecheck && npm run lint && npm run build
@@ -179,7 +198,7 @@ Eligibility is checked **on the server**, inside the enroll transaction. Races a
 ## Architecture
 
 ```
-src/lib/rules/        pure business rules + unit tests (no I/O, `now` passed in)
+src/lib/rules/        pure business rules + unit tests (no I/O, `now` passed in), incl. the learning-path layout
 src/lib/queries.ts    the only module that touches Prisma; composes rules into API shapes
 src/lib/dto.ts        response types shared by routes and UI (type-only on the client)
 src/app/api/**        thin route handlers: parse → query → JSON / errorResponse
@@ -212,5 +231,5 @@ Claude Code (Claude Opus) was a pair programmer throughout:
 - **Schema:** wrote the Prisma schema and init migration, including the partial unique index (via Prisma's `partialIndexes` preview) and the hand-written CHECK constraints. Each constraint was verified against live Postgres.
 - **Rules:** wrote the pure rule functions and 79 unit and scenario tests. I chose the rule decisions above (Option B, the whole-day seed shift, the strict "more than 3 days" check, the recommendation alternative) and reviewed each one.
 - **Data layer and API:** wrote the query layer, the routes and 17 integration tests.
-- **UI:** built the components, then drove headless Chrome through Playwright to check 375px layout, the optimistic enroll and its rollback (by forcing a 409), error and retry, keyboard focus, and the coach move. This caught two real bugs: a stale response could overwrite the next learner's view after switching, and a refresh after a move hid the confirmation.
+- **UI:** built the components, including a redesign modelled on a Swiss-minimal portfolio site I supplied as reference. It then drove headless Chrome through Playwright to check 375px layout, the optimistic enroll and its rollback (by forcing a 409), error and retry, keyboard focus, and the coach move. This caught two real bugs: a stale response could overwrite the next learner's view after switching, and a refresh after a move hid the confirmation.
 - **Docs:** drafted this README.
