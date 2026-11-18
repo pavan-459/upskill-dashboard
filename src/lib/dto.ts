@@ -31,6 +31,9 @@ export interface RecommendationDto {
   kind: RecommendationKind;
   courseId: string | null;
   courseTitle: string | null;
+  /** Lets the client render an optimistic course card before the server answers. */
+  courseTotalLessons: number | null;
+  courseSkills: string[];
   reason: string;
   goalSkills: string[];
   canEnroll: boolean;

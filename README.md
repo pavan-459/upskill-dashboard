@@ -2,29 +2,61 @@
 
 An internal learning dashboard for one job: **show coaches who is on track and who is at risk, and show each learner the one course to take next.** It is not a course catalog.
 
-> Status: session 1 done (scaffold, schema, migration, seed, rule functions and tests). The API, UI and add-ons are next.
-> Live deploy: _TBD_
+**Live demo:** _deploy link goes here_ · **Loom:** _link goes here_
+
+| Learner view (375px) | Coach view (375px) |
+|---|---|
+| <img src="docs/screenshots/learner-mobile.png" width="300" alt="Learner view on a phone: summary, recommendation and course progress" /> | <img src="docs/screenshots/coach-mobile.png" width="300" alt="Coach view on a phone: at-risk count and learners sorted by inactivity" /> |
+
+<img src="docs/screenshots/learner-desktop.png" width="820" alt="Learner view on desktop with an at-risk course and the locked courses list open" />
 
 Stack: Next.js 16 (App Router, Cache Components), Prisma 7 (`@prisma/adapter-pg`), Postgres, Tailwind 4, Vitest.
 
+## What it does
+
+- **Learner view (`/`):** pick a learner to see their goals (earned or in progress), earned skills, and active days in the last 7 with a day-by-day strip.
+  - **My courses** shows a progress bar, percent, and an *On track*, *At risk · Nd idle* or *Completed* badge for each course. At-risk courses are listed first.
+  - **Recommended next** shows one course and a one-line reason. When that pick is "finish what you started", a second, enrollable suggestion sits under it, so starting something new is always one click away.
+  - **Enroll** is optimistic: the course appears at once and the button says *Enrolling…*. On success the server returns the recomputed dashboard; on failure the card rolls back and the server's reason is shown.
+  - **Locked for now** is the why-locked add-on: for each locked course it lists the missing prerequisites and how far along each one is.
+- **Coach view (`/coach`):** a coach picks themselves and sees only learners at their center, with the at-risk count at the top. Learners are sorted at-risk first, then by days inactive, each with a reason ("No activity for 7 days · stalled on Building Dashboards").
+  - **Move learner** sends a learner to another center. They drop off this coach's list (optimistically) and appear for the other center's coach, with their progress intact.
+- **States:** skeletons while loading, an error card with *Try again*, empty states with guidance (no courses, no recommendation, no learners at a center, unknown learner), and an `aria-live` announcement on enroll.
+- **Accessibility:** works at 375px with no horizontal scroll, labelled controls, a visible focus ring on everything, and badges with icon plus text (never colour alone). Colour pairs meet AA in light and dark mode, and a skip link is included.
+
 ## Setup
+
+Requires Node 20+ and Postgres 14+.
 
 ```bash
 npm install                       # also runs `prisma generate`
 cp .env.example .env              # set DATABASE_URL
 npm run db:migrate                # apply migrations (prisma migrate dev)
-npm run db:seed                   # load /seed/*.json (re-run any time; it's idempotent)
+npm run db:seed                   # load /seed/*.json (idempotent; re-run to reset the demo)
 npm run dev                       # http://localhost:3000
-npm test                          # rule unit tests + seed scenario tests
-npm run typecheck && npm run lint
 ```
 
-| Env var        | Required | Purpose |
-|----------------|----------|---------|
-| `DATABASE_URL` | yes      | Postgres connection string (local, Neon or Supabase). |
-| `NOW`          | no       | Freezes the app clock (ISO-8601) for screenshots and debugging. Defaults to real time. |
+Tests and checks:
 
-Production: `npm run db:deploy` (prisma migrate deploy), then `npm run db:seed`.
+```bash
+npm test                          # 79 unit + seed-scenario tests (no DB needed)
+createdb upskill_test             # once
+npm run test:int                  # 17 integration tests against upskill_test (refuses any DB not named *_test)
+npm run typecheck && npm run lint && npm run build
+```
+
+| Env var | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | yes | Postgres connection string (local, Neon or Supabase). |
+| `TEST_DATABASE_URL` | no | Integration-test database. Defaults to local `upskill_test`. |
+| `NOW` | no | Freezes the app clock (ISO-8601) for screenshots and debugging. Defaults to real time. |
+
+**Deploy (Vercel + Neon):**
+1. Create a Neon database.
+2. Run `DATABASE_URL=<direct url> npm run db:deploy && DATABASE_URL=<direct url> npm run db:seed`.
+3. Import the repo in Vercel and set `DATABASE_URL` to the **pooled** URL. The build command (`prisma generate && next build`) is already in `package.json`.
+
+**Reset the demo:** run `npm run db:seed`. It undoes enrolls and moves, and re-anchors the dates to today.
 
 ## Data model
 
@@ -102,7 +134,7 @@ erDiagram
 - **Learner identity is global.** Center belonging lives only in `learner_center_memberships`.
 - **Progress is global:** `enrollments` and `activity_events` have no `center_id`. **Decision:** course progress follows the learner when they move. Re-taking a course because of a move would be wrong for the learner, and this keeps a single row of truth per (learner, course).
 
-**Coach scoping.** A coach sees a learner only if the learner's _open_ membership (`ended_at IS NULL`) is at the coach's center. Every coach query goes through one function that applies this filter (`learnersVisibleToCoach`, added with the API). After a move, the old center's coach stops seeing the learner immediately, and the new center's coach sees their full history.
+**Coach scoping.** A coach sees a learner only if the learner's _open_ membership (`ended_at IS NULL`) is at the coach's center. Every coach query goes through one function that applies this filter, `visibleToCoachWhere(centerId)` in [`src/lib/queries.ts`](src/lib/queries.ts). The move endpoint uses the same rule: a coach can only move a learner they can currently see (403 otherwise). After a move, the old center's coach stops seeing the learner immediately, and the new center's coach sees their full history.
 
 **Moving a learner.** One transaction sets `ended_at = now()` on the open row and inserts a new open row for the new center. The partial unique index makes a double move impossible: two open rows for one learner cannot exist.
 
@@ -120,7 +152,7 @@ All rules are pure functions in [`src/lib/rules/`](src/lib/rules/), with thresho
    3. an eligible, unenrolled course that unlocks the most other courses;
    4. none, with the specific reason (everything enrolled / nothing unlocked yet / no goals / goals all earned / no course teaches the goal).
 
-   It always returns a one-line reason, and each branch has tests. With the seed, all three learners land on branch 2, because each already holds the course that teaches their goal.
+   It always returns a one-line reason, and each branch has tests. With the seed, all three learners land on branch 2, because each already holds the course that teaches their goal. That would leave no Enroll button anywhere, so when the main pick isn't enrollable, `recommendAlternative` adds one secondary pick: branch 3, or else any open course ("it is open to you now"). It is also tested.
 4. **No activity log → `activity_events`.** The seed creates one event per progress row (at `lastActiveAt`). Enrolling and progress updates append events. **Active days (last 7)** is the number of distinct `Asia/Kolkata` calendar dates with an event from today back 6 days (7 dates including today). Future events are ignored.
 5. **At-risk.**
    - _Per course:_ not finished (< 100%) **and** no activity on that course for **more than** 3 × 24 h. Exactly 72 h still counts as on-track. A finished course is never at-risk; its badge reads "Completed". If a course has no events at all, the enrolment time counts as its last activity.
@@ -128,18 +160,57 @@ All rules are pure functions in [`src/lib/rules/`](src/lib/rules/), with thresho
 6. **Percent display** rounds down (199/200 shows 99%, never "100%" before every lesson is done).
 7. **Seed validation.** `courses.json` has no lesson counts, so `total_lessons` comes from `progress.json`. The loader fails loudly if a course has two different totals, if a course has no total, if a prerequisite is unknown or self-referencing, if a progress row has no enrollment, or if completed > total.
 
-## Add-ons
+## API
 
-_Planned:_ coach at-risk view (scoped by center), why-locked hints (pure function `lockedHint` already tested), move learner between centers.
+All responses are JSON. Errors look like `{ "error": "<code>", "reason": "<human sentence>" }`. Inputs are validated with zod, and every handler runs at request time.
+
+| Method & path | Success | Errors |
+|---|---|---|
+| `GET /api/students` | `[{ id, name, centerName }]` for the picker | |
+| `GET /api/students/:id` | goals, earnedSkills, activeDays7, activityStrip, courses (percent, status, daysInactive), recommendation and alternative (with reason), locked (why-locked) | 404 |
+| `POST /api/enrollments` `{ studentId, courseId }` | **201** with the refreshed dashboard, so the recommendation is recomputed in one round trip | **400** ineligible, with the why-locked reason ("Enroll in and finish SQL Fundamentals first") or bad input · 404 · **409** already enrolled |
+| `GET /api/coaches` | coaches with their center (for the switcher) | |
+| `GET /api/coaches/:id/learners` | `{ coach, atRiskCount, learners[] }`, scoped to the coach's center and sorted | 404 |
+| `GET /api/centers` | centers (move targets) | |
+| `POST /api/learners/:id/move` `{ centerId, coachId? }` | `{ from, to, movedAt }` | 403 coach can't see this learner · 404 · 409 already at that center |
+
+Eligibility is checked **on the server**, inside the enroll transaction. Races are settled by the database: two simultaneous enrolls hit `unique(learner_id, course_id)` and the loser gets a 409. Two simultaneous moves hit the partial unique index. Both cases have integration tests.
+
+## Architecture
+
+```
+src/lib/rules/        pure business rules + unit tests (no I/O, `now` passed in)
+src/lib/queries.ts    the only module that touches Prisma; composes rules into API shapes
+src/lib/dto.ts        response types shared by routes and UI (type-only on the client)
+src/app/api/**        thin route handlers: parse → query → JSON / errorResponse
+src/components/**     client UI; fetch the API, optimistic updates via useOptimistic
+test/*.int.test.ts    integration tests against a real Postgres
+```
+
+The pages are prerendered shells. The dashboards are client components behind `<Suspense>` that call the API, which is what makes optimistic enroll and move with rollback straightforward.
+
+## Add-ons built
+
+1. **Coach at-risk view.** This is the job the brief names first ("who is on track and who is at risk"). It shows the at-risk count up front, sorts by days inactive, gives a reason per learner, and links to the learner's detail. It also makes multi-center scoping visible.
+2. **Why-locked hints.** "Finish JavaScript Essentials: 2 lessons left" plus a mini progress bar for each missing prerequisite. The same `lockedHint` text is the 400 reason the API returns, so the UI and the server always agree.
+3. **Move learner between centers.** This proves the membership model end to end: history is kept, progress follows the learner, visibility flips between coaches, the coach-scope check gives 403, and the database stops double moves.
 
 ## Deliberately not built
 
-- **Course catalog or browsing.** Out of scope per the brief. The product is triage, not discovery.
-- **Authentication.** A role/user switcher stands in, which keeps the demo one click away.
+- **Course catalog or browsing.** Out of scope per the brief. The product is triage, not discovery. The only course lists are the learner's own courses, one recommendation (plus one fallback), and locked courses with their reasons.
+- **Authentication.** A Learner/Coach switcher and pickers stand in. The coach id is passed explicitly, so scoping is real at the API level, even though identity isn't verified.
 - **Full multi-tenant admin UI.** The schema supports it; one move action proves the model.
-- **Notifications and email.**
+- **Logging progress from the UI.** Lesson progress would come from the course player. Enroll and the seed are the only writers here.
+- **Notifications or email,** and coach nudge notes.
 - **Lesson content or a player.**
 
 ## How Claude was used
 
-Claude Code (Opus) was used to read the brief, scaffold the project, write the Prisma schema and migration (including the partial unique index and CHECK constraints), the seed loader and script, the rule functions and their tests. I reviewed each decision recorded above.
+Claude Code (Claude Opus) was a pair programmer throughout:
+
+- **Planning:** read the brief, proposed the work order, and identified the seed-data traps up front.
+- **Schema:** wrote the Prisma schema and init migration, including the partial unique index (via Prisma's `partialIndexes` preview) and the hand-written CHECK constraints. Each constraint was verified against live Postgres.
+- **Rules:** wrote the pure rule functions and 79 unit and scenario tests. I chose the rule decisions above (Option B, the whole-day seed shift, the strict "more than 3 days" check, the recommendation alternative) and reviewed each one.
+- **Data layer and API:** wrote the query layer, the routes and 17 integration tests.
+- **UI:** built the components, then drove headless Chrome through Playwright to check 375px layout, the optimistic enroll and its rollback (by forcing a 409), error and retry, keyboard focus, and the coach move. This caught two real bugs: a stale response could overwrite the next learner's view after switching, and a refresh after a move hid the confirmation.
+- **Docs:** drafted this README.

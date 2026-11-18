@@ -102,7 +102,13 @@ async function recentEventTimes(learnerIds: string[], now: Date) {
 }
 
 function toRecommendationDto(r: Recommendation, catalog: CourseCatalog): RecommendationDto {
-  return { ...r, courseTitle: r.courseId ? (catalog.get(r.courseId)?.title ?? null) : null };
+  const course = r.courseId ? catalog.get(r.courseId) : undefined;
+  return {
+    ...r,
+    courseTitle: course?.title ?? null,
+    courseTotalLessons: course?.totalLessons ?? null,
+    courseSkills: course?.skills ?? [],
+  };
 }
 
 const STATUS_ORDER: Record<CourseStatus, number> = { "at-risk": 0, "on-track": 1, completed: 2 };

@@ -1,26 +1,90 @@
 @import "tailwindcss";
 
+/* Design tokens. Every colour pair below meets WCAG AA (4.5:1) for text. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --surface-muted: #f1f3f6;
+  --border: #dde1e7;
+  --foreground: #14171c;
+  --muted: #555e6b;
+  --accent: #3b46c4;
+  --accent-hover: #2f39a8;
+  --accent-fg: #ffffff;
+  --accent-soft: #eceefc;
+  --success: #17663a;
+  --success-soft: #e5f4ea;
+  --warning: #8a4b00;
+  --warning-soft: #fdf0dc;
+  --danger: #a3261c;
+  --danger-soft: #fce9e7;
+  --focus: #3b46c4;
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f1115;
+    --surface: #171a20;
+    --surface-muted: #1f232b;
+    --border: #2d323c;
+    --foreground: #eceef2;
+    --muted: #a3abb8;
+    --accent: #8b94f5;
+    --accent-hover: #a2a9f7;
+    --accent-fg: #0f1115;
+    --accent-soft: #23264a;
+    --success: #6fd49a;
+    --success-soft: #15291e;
+    --warning: #f3b860;
+    --warning-soft: #2d2212;
+    --danger: #f2877d;
+    --danger-soft: #2f1715;
+    --focus: #a2a9f7;
+    color-scheme: dark;
   }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* One visible focus style for every interactive element. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
