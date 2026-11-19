@@ -44,6 +44,9 @@ import {
 /** Only events this recent can count towards "active days" (8 days covers any IST offset). */
 const ACTIVITY_LOOKBACK_MS = 8 * DAY_MS;
 
+/** Serverless Postgres (e.g. Neon) can take a few seconds to wake; Prisma's default wait is 2s. */
+const TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
+
 // ---------------------------------------------------------------------------
 // Catalog
 // ---------------------------------------------------------------------------
@@ -269,7 +272,7 @@ export async function enroll(learnerId: string, courseId: string, now: Date): Pr
 
       await tx.enrollment.create({ data: { learnerId, courseId, enrolledAt: now, completedLessons: 0 } });
       await tx.activityEvent.create({ data: { learnerId, courseId, kind: "ENROLLED", occurredAt: now } });
-    });
+    }, TX_OPTIONS);
   } catch (err) {
     // Two concurrent enrolls: the unique (learner_id, course_id) key decides.
     if (isUniqueViolation(err)) throw alreadyEnrolled();
@@ -406,7 +409,7 @@ export async function moveLearner(
       }
       await tx.learnerCenterMembership.create({ data: { learnerId, centerId, startedAt: now } });
       return { learnerId, from: open?.center ?? null, to, movedAt: now.toISOString() };
-    });
+    }, TX_OPTIONS);
   } catch (err) {
     // A concurrent move already opened a membership: the partial unique index decides.
     if (isUniqueViolation(err)) throw conflict("This learner was just moved. Refresh and try again.");

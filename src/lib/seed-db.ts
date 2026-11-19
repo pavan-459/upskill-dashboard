@@ -92,7 +92,7 @@ export async function seedDatabase(db: PrismaClient, now: Date): Promise<string>
         occurredAt: at(p.lastActiveAt),
       })),
     });
-  });
+  }, { maxWait: 20_000, timeout: 120_000 }); // remote DBs may be waking up; many round trips
 
   const days = Math.round(offset / 86_400_000);
   return (
