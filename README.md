@@ -60,7 +60,7 @@ npm run dev                       # http://localhost:3000
 Tests and checks:
 
 ```bash
-npm test                          # 85 unit + seed-scenario tests (no DB needed)
+npm test                          # 87 unit + seed-scenario tests (no DB needed)
 createdb upskill_test             # once
 npm run test:int                  # 17 integration tests against upskill_test (refuses any DB not named *_test)
 npm run typecheck && npm run lint && npm run build

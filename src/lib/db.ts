@@ -1,9 +1,25 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 
+/**
+ * pg currently treats sslmode=prefer/require/verify-ca as verify-full, warns about
+ * it, and will weaken them in its next major version. Hosted URLs (e.g. Neon's)
+ * ship with sslmode=require, so pin today's strict behaviour explicitly.
+ */
+export function normalizeSslMode(url: string): string {
+  try {
+    const u = new URL(url);
+    const mode = u.searchParams.get("sslmode");
+    if (mode && ["prefer", "require", "verify-ca"].includes(mode)) u.searchParams.set("sslmode", "verify-full");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function createPrismaClient(connectionString = process.env.DATABASE_URL) {
   if (!connectionString) throw new Error("DATABASE_URL is not set");
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  return new PrismaClient({ adapter: new PrismaPg({ connectionString: normalizeSslMode(connectionString) }) });
 }
 
 // Reuse one client (one pool) per process; survive Next.js dev hot reloads.
