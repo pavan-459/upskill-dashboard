@@ -2,7 +2,7 @@
 
 An internal learning dashboard for one job: **show coaches who is on track and who is at risk, and show each learner the one course to take next.** It is not a course catalog.
 
-**Live demo:** https://upskill-pavan-v0.vercel.app (Vercel + Neon Postgres, US East) · **Loom:** _link goes here_
+**Live demo:** https://upskill-pavan-v0.vercel.app (Vercel + Neon Postgres, US East) · **Screenshots:** below
 
 Try it: open [Aisha](https://upskill-pavan-v0.vercel.app/?student=s1), enroll in the suggested course and watch the path update; switch to [Rohan](https://upskill-pavan-v0.vercel.app/?student=s2) (at risk); then open the [coach view](https://upskill-pavan-v0.vercel.app/coach) and move a learner between centers. The demo data is re-seeded so dates are recent; changes you make persist until the next re-seed.
 
@@ -264,4 +264,4 @@ The brief allows Claude as long as its use is declared, so here is the full acco
 - **Direction:** set the goal (highest score, no cut scope) and the plan for each session, and asked for the redesign, choosing the reference site.
 - **Decisions:** the rule decisions (Option B, whole-day seed shift, strict "more than 3 days", the enrollable alternative) were proposed by Claude, and I reviewed and kept them.
 - **Accounts:** handled GitHub authentication and pushing, and the Vercel and Neon accounts for the deploy.
-- **Review:** reviewed the diffs, screenshots and README before submission. The Loom and the reply to the reviewer are mine.
+- **Review:** reviewed the diffs, screenshots and README before submission. The reply to the reviewer is mine.
