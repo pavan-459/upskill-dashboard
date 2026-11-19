@@ -225,11 +225,41 @@ The pages are prerendered shells. The dashboards are client components behind `<
 
 ## How Claude was used
 
-Claude Code (Claude Opus) was a pair programmer throughout:
+The brief allows Claude as long as its use is declared, so here is the full account. I used **Claude Code** (model: Claude Opus 5.5) in VS Code over three sessions as a pair programmer. Claude wrote most of the code and tests and ran the verification. I set direction, made the calls listed under *What I did*, and reviewed the results.
 
-- **Planning:** read the brief, proposed the work order, and identified the seed-data traps up front.
-- **Schema:** wrote the Prisma schema and init migration, including the partial unique index (via Prisma's `partialIndexes` preview) and the hand-written CHECK constraints. Each constraint was verified against live Postgres.
-- **Rules:** wrote the pure rule functions and 79 unit and scenario tests. I chose the rule decisions above (Option B, the whole-day seed shift, the strict "more than 3 days" check, the recommendation alternative) and reviewed each one.
-- **Data layer and API:** wrote the query layer, the routes and 17 integration tests.
-- **UI:** built the components, including a redesign modelled on a Swiss-minimal portfolio site I supplied as reference. It then drove headless Chrome through Playwright to check 375px layout, the optimistic enroll and its rollback (by forcing a 409), error and retry, keyboard focus, and the coach move. This caught two real bugs: a stale response could overwrite the next learner's view after switching, and a refresh after a move hid the confirmation.
-- **Docs:** drafted this README.
+### What Claude built
+
+| Area | What Claude did | How it was verified |
+|---|---|---|
+| **Planning** | Read the brief and the seed data, spotted the traps (stale dates, complete vs earned, empty goal-overlap recommendations, no activity log), and wrote the session plan and work order. | The traps are covered by rules and tests (section *Rules and decisions*). |
+| **Scaffold** | Set up Next.js 16, Prisma 7 with the `pg` driver adapter, Tailwind 4 and Vitest, and installed local Postgres 17 with Homebrew. It pinned Prisma to the stable 7.10.1 because npm's `latest` tag pointed at an 8.0 release candidate. | Build, typecheck and lint run on every change. |
+| **Schema and migration** | Wrote the normalized schema, including the multi-center design: the one-open-membership rule as a partial unique index (Prisma's `partialIndexes` preview), plus hand-written CHECK constraints (no self-prerequisite, positive lesson counts, valid membership ranges). | Inserted bad rows into live Postgres and confirmed each constraint rejects them; confirmed the migration has no drift. |
+| **Seed** | Wrote a validating seed loader (zod) and an idempotent seed script, added the centers, coaches and memberships, and shifted timestamps by whole days. | Seed scenario tests pin down what the demo shows; a test proves that without the shift everyone looks at risk. |
+| **Business rules** | Wrote the pure functions: percent, complete/earned, eligibility, why-locked hints, per-course and per-learner at-risk, active days in IST, the recommendation with its four fallback branches, the enrollable alternative, and the learning-path layout. | **85 unit and scenario tests**, including one for every recommendation branch and the edge cases (exactly 72h, 199/200, IST midnight). |
+| **Data layer and API** | Wrote a single Prisma access module with one coach-scoping filter, transactional enroll and move, typed errors mapped to 400/403/404/409, and the seven route handlers. | **17 integration tests** against a real `upskill_test` database (it refuses any other): scoping, enroll errors, concurrent enrolls, moves and history. `curl` checked every status code. |
+| **UI (first version)** | Built the learner and coach views with optimistic enroll and move, rollback on failure, skeleton, error and empty states, and accessibility basics. | Scripted browser checks (below). |
+| **UI redesign** | Rebuilt the UI in the style of a reference site I chose (works.budarina.design). Claude screenshotted the site, pulled out its design language, and added stat tiles, the interactive learning-path map, goal progress against the 80% line, filters, expandable cards, toasts, dialogs, explainers and dark mode. | **31 scripted interaction checks** in headless Chrome, plus screenshot review at 375px, desktop and dark mode. |
+| **Docs** | Drafted this README (setup, ER diagram, decisions, API, architecture) and took the screenshots. | Reviewed by me. |
+
+### Tools Claude used along the way
+
+- **Framework docs bundled with Next.js 16**, read before writing code. They showed that Cache Components rejects `export const dynamic` (DB reads go after `connection()` behind `<Suspense>`) and that route params are Promises (`RouteContext`).
+- **`psql`**, to inspect tables, constraints and indexes and to try invalid writes.
+- **Playwright driving the installed Chrome**, to click through real flows. To prove the rollback works, it forced server failures (500s and 409s), slowed responses down to catch loading states, and measured horizontal overflow at 375px.
+- **`curl`**, to smoke-test every API route and status code.
+- **git and the GitHub CLI**, for checkpoint commits and pushes.
+
+### Bugs Claude found in its own work (all fixed)
+
+1. **Stale response:** switching learners while an enroll was in flight could overwrite the new learner's view with the old learner's data. Fixed with an unmount guard.
+2. **Lost confirmation:** after moving a learner, the list refresh swapped the view for a skeleton, which lost the confirmation and briefly showed the moved learner again. Fixed by fetching the fresh list inside the same transition and keeping data on screen during a refresh.
+3. **Unclear coach reason:** when a learner was idle everywhere *and* stalled on a course, the coach saw only "No activity for 7 days". The reason now names the stalled course too.
+4. **Clipped dialog text:** the rules dialog inherited `nowrap` from the header and clipped its text on phones.
+5. **Layout polish:** the header wrapped, the center label had doubled brackets, and learning-path nodes were clipped at 375px.
+
+### What I did
+
+- **Direction:** set the goal (highest score, no cut scope) and the plan for each session, and asked for the redesign, choosing the reference site.
+- **Decisions:** the rule decisions (Option B, whole-day seed shift, strict "more than 3 days", the enrollable alternative) were proposed by Claude, and I reviewed and kept them.
+- **Accounts:** handled GitHub authentication and pushing, and the Vercel and Neon accounts for the deploy.
+- **Review:** reviewed the diffs, screenshots and README before submission. The Loom and the reply to the reviewer are mine.
